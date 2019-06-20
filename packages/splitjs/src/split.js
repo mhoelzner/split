@@ -157,8 +157,8 @@ const Split = (idsOption, options = {}) => {
 
     // Standardize minSize to an array if it isn't already. This allows minSize
     // to be passed as a number.
-    const minSize = getOption(options, 'minSize', 100)
-    const minSizes = Array.isArray(minSize) ? minSize : ids.map(() => minSize)
+    let minSize = getOption(options, 'minSize', 100)
+    let minSizes = Array.isArray(minSize) ? minSize : ids.map(() => minSize)
 
     // Get other options
     const expandToMin = getOption(options, 'expandToMin', false)
@@ -690,6 +690,19 @@ const Split = (idsOption, options = {}) => {
         }
     })
 
+    function setMinSizes(newMinSizes) {
+        minSizes = newMinSizes;
+        elements.forEach(function(element, i) {
+            element.minSize = minSizes[i];
+        })
+    }
+
+    function getMinSizes() {
+        return elements.map(function(element) {
+            return element.minSize;
+        })
+    }
+
     function setSizes(newSizes) {
         const trimmed = trimToMin(newSizes)
         trimmed.forEach((newSize, i) => {
@@ -741,6 +754,8 @@ const Split = (idsOption, options = {}) => {
     return {
         setSizes,
         getSizes,
+        setMinSizes: setMinSizes,
+        getMinSizes: getMinSizes,
         collapse(i) {
             adjustToMin(elements[i])
         },
