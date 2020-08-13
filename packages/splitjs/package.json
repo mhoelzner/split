@@ -39,5 +39,9 @@
     "collective": {
         "type": "opencollective",
         "url": "https://opencollective.com/splitjs"
+    },
+    "devDependencies": {
+        "@rollup/plugin-buble": "^0.21.3",
+        "rollup-plugin-terser": "^7.0.0"
     }
 }
