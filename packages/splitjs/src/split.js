@@ -307,7 +307,7 @@ const Split = (idsOption, options = {}) => {
 
             let gSize = this[aGutterSize];
 
-            if (multipleDrag) {
+            //if (multipleDrag) {
                 // while (a.i !== 0 && offset < this.start + a.minSize) {
                 //     gSize = this$1[aGutterSize];
                 //     adjust.call(this$1, gSize);
@@ -315,7 +315,7 @@ const Split = (idsOption, options = {}) => {
                 //     calculateSizes.call(this$1);
                 //     offset = offset - this$1.start                    
                 // }
-            }
+            //}
 
             if (offset <= a.minSize + snapOffset + gSize) {
                 offset = a.minSize + gSize
@@ -351,8 +351,6 @@ const Split = (idsOption, options = {}) => {
 
         // Actually adjust the size.
         adjust.call(this, offset)
-
-        calculateSizes.call(this);
 
         lastDragOffset = getMousePosition(e);
 
