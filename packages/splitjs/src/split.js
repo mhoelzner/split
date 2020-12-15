@@ -138,6 +138,7 @@ const Split = (idsOption, options = {}) => {
     let positionEnd
     let clientSize
     let elements
+    let lastDragOffset
 
     // Allow HTMLCollection to be used as an argument when supported
     if (Array.from) {
@@ -165,6 +166,7 @@ const Split = (idsOption, options = {}) => {
     const gutterSize = getOption(options, 'gutterSize', 10)
     const gutterAlign = getOption(options, 'gutterAlign', 'center')
     const snapOffset = getOption(options, 'snapOffset', 30)
+    const multipleDrag = getOption(options, 'multipleDrag', false);
     const dragInterval = getOption(options, 'dragInterval', 1)
     const direction = getOption(options, 'direction', HORIZONTAL)
     const cursor = getOption(
@@ -274,19 +276,23 @@ const Split = (idsOption, options = {}) => {
     // ---------------------------------------------------------------------
     // | <- this.start                                        this.size -> |
     function drag(e) {
-        let offset
-        const a = elements[this.a]
-        const b = elements[this.b]
 
-        if (!this.dragging) return
+        let this$1 = this
+
+        let offset
+        let a = elements[this.a]
+        let b = elements[this.b]
+
+        if (this.draggingDir === null) { return }
 
         // Get the offset of the event from the first side of the
         // pair `this.start`. Then offset by the initial position of the
         // mouse compared to the gutter size.
-        offset =
-            getMousePosition(e) -
-            this.start +
-            (this[aGutterSize] - this.dragOffset)
+        const currDragOffset = getMousePosition(e)
+        this.draggingDir = Math.sign(currDragOffset - lastDragOffset)
+        if (this.draggingDir === 0) { return }
+
+        offset = currDragOffset - this.start + (this[aGutterSize] - this.dragOffset)
 
         if (dragInterval > 1) {
             offset = Math.round(offset / dragInterval) * dragInterval
@@ -295,17 +301,60 @@ const Split = (idsOption, options = {}) => {
         // If within snapOffset of min or max, set offset to min or max.
         // snapOffset buffers a.minSize and b.minSize, so logic is opposite for both.
         // Include the appropriate gutter sizes to prevent overflows.
-        if (offset <= a.minSize + snapOffset + this[aGutterSize]) {
-            offset = a.minSize + this[aGutterSize]
-        } else if (
-            offset >=
-            this.size - (b.minSize + snapOffset + this[bGutterSize])
-        ) {
-            offset = this.size - (b.minSize + this[bGutterSize])
+        if (this.draggingDir === -1) {
+
+            if (b.isCollapsed) { return }
+
+            let gSize = this[aGutterSize];
+
+            if (multipleDrag) {
+                // while (a.i !== 0 && offset < this.start + a.minSize) {
+                //     gSize = this$1[aGutterSize];
+                //     adjust.call(this$1, gSize);
+                //     a = elements[this$1.a -= 1];
+                //     calculateSizes.call(this$1);
+                //     offset = offset - this$1.start                    
+                // }
+            }
+
+            if (offset <= a.minSize + snapOffset + gSize) {
+                offset = a.minSize + gSize
+            } else if (offset >= this.size - (b.minSize + snapOffset + this[bGutterSize])) {
+                offset = this.size - (b.minSize + this[bGutterSize])
+            } 
+
+        }
+
+        if (this.draggingDir === 1) {
+
+            if (a.isCollapsed) { return }
+
+            let gSize$1 = this.size - (b.minSize + snapOffset + this[bGutterSize])
+
+            if (multipleDrag) {
+
+                while (b.i !== (pairs.length - 1) && offset > (this.size - b.minSize)) {
+                    gSize$1 = this$1.size - (b.minSize + snapOffset + this$1[bGutterSize])
+                    adjust.call(this$1, gSize$1)
+                    b = elements[this$1.b += 1]
+                    calculateSizes.call(this$1)
+                }
+            }
+
+            if (offset >= this.size - (b.minSize + snapOffset + this[bGutterSize])) {
+                offset = this.size - (b.minSize + this[bGutterSize])
+            } else if (offset <= a.minSize + snapOffset + this[aGutterSize]) {
+                offset = a.minSize + this[aGutterSize]
+            }
+
         }
 
         // Actually adjust the size.
         adjust.call(this, offset)
+
+        calculateSizes.call(this);
+
+        lastDragOffset = getMousePosition(e);
 
         // Call the drag callback continously. Don't do anything too intensive
         // in this callback.
@@ -442,14 +491,20 @@ const Split = (idsOption, options = {}) => {
     // stopDragging is very similar to startDragging in reverse.
     function stopDragging() {
         const self = this
+
+        self.a = self.aOrig
+        self.b = self.bOrig
+        calculateSizes.call(self)
+
         const a = elements[self.a].element
         const b = elements[self.b].element
 
-        if (self.dragging) {
+        if (self.draggingDir !== null) {
             getOption(options, 'onDragEnd', NOOP)(getSizes())
         }
 
-        self.dragging = false
+        self.draggingDir = null
+        lastDragOffset = null
 
         // Remove the stored event listeners. This is why we store them.
         global[removeEventListener]('mouseup', self.stop)
@@ -493,11 +548,16 @@ const Split = (idsOption, options = {}) => {
 
         // Alias frequently used variables to save space. 200 bytes.
         const self = this
+
+        self.a = self.aOrig
+        self.b = self.bOrig
+        calculateSizes.call(self)
+
         const a = elements[self.a].element
         const b = elements[self.b].element
 
         // Call the onDragStart callback.
-        if (!self.dragging) {
+        if (self.draggingDir === null) {
             getOption(options, 'onDragStart', NOOP)(getSizes())
         }
 
@@ -505,7 +565,8 @@ const Split = (idsOption, options = {}) => {
         e.preventDefault()
 
         // Set the dragging property of the pair object.
-        self.dragging = true
+        self.draggingDir = 0
+        lastDragOffset = getMousePosition(e)
 
         // Create two event listeners bound to the same pair object and store
         // them in the pair object.
@@ -578,6 +639,7 @@ const Split = (idsOption, options = {}) => {
             size: sizes[i],
             minSize: minSizes[i],
             i,
+            isCollapsed: false,
         }
 
         let pair
@@ -587,9 +649,12 @@ const Split = (idsOption, options = {}) => {
             pair = {
                 a: i - 1,
                 b: i,
+                aOrig: i - 1,
+                bOrig: i,
                 dragging: false,
                 direction,
                 parent,
+                draggingDir: null,
             }
 
             pair[aGutterSize] = getGutterSize(
@@ -610,9 +675,12 @@ const Split = (idsOption, options = {}) => {
                 parentFlexDirection === 'row-reverse' ||
                 parentFlexDirection === 'column-reverse'
             ) {
-                const temp = pair.a
+                let temp = pair.a
                 pair.a = pair.b
                 pair.b = temp
+                temp = pair.aOrig
+                pair.aOrig = pair.bOrig
+                pair.bOrig = temp
             }
         }
 
@@ -758,6 +826,9 @@ const Split = (idsOption, options = {}) => {
         getMinSizes: getMinSizes,
         collapse(i) {
             adjustToMin(elements[i])
+        },
+        setCollapsedState: function setCollapsedState(i, state) {
+            elements[i].isCollapsed = state
         },
         destroy,
         parent,
